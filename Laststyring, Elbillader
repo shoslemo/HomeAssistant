@@ -1,0 +1,49 @@
+alias: Lastbalansering trinnvis
+description: Lader reguleres i trinn på 6, 10, 16, 25, 32A
+triggers:
+  - seconds: /15
+    trigger: time_pattern
+actions:
+  - variables:
+      total_power_w: "{{ states('sensor.kamstrup_active_power_import') | float(0) }}"
+      limit_w: "{{ states('input_number.onsket_effektgrense') | float(0) * 1000 }}"
+      margin_up_w: 2500
+      margin_down_w: 0
+      current_a: "{{ states('number.garasje_charger_max_current') | float(0) }}"
+      steps:
+        - 6
+        - 10
+        - 16
+        - 25
+        - 32
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ total_power_w > (limit_w + margin_down_w) }}"
+        sequence:
+          - target:
+              entity_id: number.garasje_charger_max_current
+            data:
+              value: |
+                {% set idx = steps.index(current_a|int) %} {% if idx > 0 %}
+                  {{ steps[idx-1] }}
+                {% else %}
+                  {{ steps[0] }}
+                {% endif %}
+            action: number.set_value
+      - conditions:
+          - condition: template
+            value_template: "{{ total_power_w < (limit_w - margin_up_w) }}"
+        sequence:
+          - target:
+              entity_id: number.garasje_charger_max_current
+            data:
+              value: >
+                {% set idx = steps.index(current_a|int) %} {% if idx <
+                (steps|length - 1) %}
+                  {{ steps[idx+1] }}
+                {% else %}
+                  {{ steps[-1] }}
+                {% endif %}
+            action: number.set_value
+mode: single
