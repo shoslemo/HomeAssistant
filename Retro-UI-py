@@ -18,7 +18,7 @@ import websocket
 
 
 HA_URL = "http://HA-URL:8123"
-TOKEN = "DIN-TOKEN-HER"  # Lag nytt token i HA og lim inn her
+TOKEN = "DIN TOKEN"  # Lag nytt token i HA og lim inn her
 CONFIG_PATH = os.path.expanduser("~/.ha_dos_tui.conf")
 headers = {
     "Authorization": f"Bearer {TOKEN}",
@@ -314,8 +314,18 @@ def build_area_entity_map():
 
         area_entity_map.setdefault(area_id, []).append(eid)
 
+def get_areas_with_all():
+    """Returner områder med 'Alle' som første element"""
+    all_entry = {"area_id": None, "name": "Alle"}
+    return [all_entry] + areas
+
+
 def filter_entities_by_area_and_domain(area_id, domain):
     result = []
+    if area_id is None:
+        # "Alle" - returner alle entities i dette domenet
+        return [e for e in entities if e["entity_id"].startswith(domain + ".")]
+    
     for eid in area_entity_map.get(area_id, []):
         if not eid.startswith(domain + "."):
             continue
@@ -326,6 +336,9 @@ def filter_entities_by_area_and_domain(area_id, domain):
 
 
 def count_entities_in_area(area_id):
+    if area_id is None:
+        # "Alle" - returner totalt antall entities
+        return len(entities)
     return len(area_entity_map.get(area_id, []))
 # =========================
 # WEBSOCKET-LOGG (STATE CHANGES)
@@ -557,14 +570,15 @@ def get_state_color(state):
     return curses.color_pair(1)
 def draw_areas_panel(stdscr, top, bottom, x_start, width, selected_area_index, active_panel, current_area_id):
     draw_box(stdscr, top, x_start, bottom, x_start + width, " Areas ", 1)
-    if not areas:
+    areas_with_all = get_areas_with_all()
+    if not areas_with_all:
         safe_addstr(stdscr, top + 1, x_start + 2, "Ingen areas", curses.A_DIM)
         return
     max_rows = bottom - top - 1
     start = 0
     if selected_area_index >= max_rows:
         start = selected_area_index - max_rows + 1
-    visible = areas[start:start + max_rows]
+    visible = areas_with_all[start:start + max_rows]
     for i, area in enumerate(visible):
         row = top + 1 + i
         name = area.get("name", area.get("area_id", "ukjent"))
@@ -649,11 +663,12 @@ def draw_details_panel(stdscr, top, bottom, x_start, width, entity):
         if y >= bottom:
             break
 def get_current_area_id(selected_area_index):
-    if not areas:
+    areas_with_all = get_areas_with_all()
+    if not areas_with_all:
         return None
-    if selected_area_index < 0 or selected_area_index >= len(areas):
+    if selected_area_index < 0 or selected_area_index >= len(areas_with_all):
         return None
-    return areas[selected_area_index].get("area_id")
+    return areas_with_all[selected_area_index].get("area_id")
 
 # =========================
 # SCRIPT & AUTOMATION HELPERS
@@ -671,11 +686,10 @@ def get_automations():
 def get_entities_for_view(view_mode, current_area_id, current_domain, search_term, favorites_list):
     with entities_lock:
         if view_mode == "domain":
-            if current_area_id:
-                filtered = filter_entities_by_area_and_domain(current_area_id, current_domain)
-                if filtered:
-                    return filtered
-
+            # Alltid bruk områdefiltrering hvis områder er tilgjengelige
+            if areas or current_area_id is not None:
+                return filter_entities_by_area_and_domain(current_area_id, current_domain)
+            
             return [e for e in entities if e["entity_id"].startswith(current_domain + ".")]
 
         elif view_mode == "favorites":
@@ -1450,7 +1464,8 @@ def main(stdscr):
 
         elif key == curses.KEY_DOWN:
             if active_panel == 0:
-                selected_area_index = min(len(areas) - 1, selected_area_index + 1) if areas else 0
+                areas_with_all = get_areas_with_all()
+                selected_area_index = min(len(areas_with_all) - 1, selected_area_index + 1) if areas_with_all else 0
                 selected_entity_index = 0
             elif active_panel == 1:
                 selected_domain_index = min(len(DOMAINS) - 1, selected_domain_index + 1)
