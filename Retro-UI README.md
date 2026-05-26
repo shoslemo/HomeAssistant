@@ -1,18 +1,4 @@
-RETRO INTERFACE FOR CONTROLLING HOME ASSISTANT
 
-
-Quick start:
-
-1: Install Python
-2: Create venv ( python3 -m venv venv )
-3: Activate venv ( source venv/bin/activate )
-4: Install requests and websocket-client ( pip install requests websocket-client )
-5: Edit file (add your HA url and long lived access token)
-6: Create the file ( nano Retro-HA.py > paste your modified file > ctrl+O, Enter/Return, ctrl+X)
-7: Run and enjoy! ( python3 Retro-HA.py )
-
-
-Still a work in progress, but mostly functional. Please improve, modify and share!
 
 
 
